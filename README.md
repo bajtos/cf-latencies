@@ -4,7 +4,6 @@ Exploration of Cloudflare D1/KV/Cache latencies
 
 ## Observations
 
-- Cold reads from KV and D1 can be slow, up to 200-300ms.
 - D1 is much slower than KV:
   - D1: ~300-500ms for every read.
   - KV: ~160ms for the first read, less than 10ms for subsequent reads.

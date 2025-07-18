@@ -4,7 +4,8 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "cf-latencies",
+  "name": "bajtos-cf-latencies",
+  "account_id": "37573110e38849a343d93b727953188f",
   "main": "src/index.ts",
   "compatibility_date": "2025-07-18",
   "compatibility_flags": ["global_fetch_strictly_public"],
@@ -49,15 +50,15 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "cf-latencies",
-      "database_id": "2146627c-7b02-47d0-ab5b-a7b8a12ed175",
+      "database_name": "bajtos-cf-latencies",
+      "database_id": "ea79025e-4f35-4bf4-85dd-bd3a69b7afea",
     },
   ],
 
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "43b8cb481fc04cc9bc376368637f1cce",
+      "id": "a5b855e5de174780ab3be44fb00505a8",
     },
   ],
 }

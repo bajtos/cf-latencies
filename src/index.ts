@@ -23,7 +23,13 @@ export default {
       await env.KV.put("main", "Hello from KV!");
     }
 
-    return new Response(JSON.stringify({ result, duration }, null, 2));
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+
+    return new Response(JSON.stringify({ result, duration }, null, 2), {
+      headers: {
+        "Cache-Control": "public, max-age=600, s-maxage=600",
+      },
+    });
   },
 } satisfies ExportedHandler<Env>;
 
@@ -39,32 +45,107 @@ async function handle(
       return env.DB.prepare("SELECT * FROM main LIMIT 1").first();
     case "/kv":
       return env.KV.get("main");
+
+    case "/fetched/kv":
+      return fetchWithDefaultCaching("/kv", request, env, ctx);
+    case "/fetched/d1":
+      return fetchWithDefaultCaching("/d1", request, env, ctx);
+    case "/fetched/filcdn":
+      return fetchWithDefaultCaching(
+        "https://0x23178ccd27cda5d5d18b211ad6648e189c1e16e1.calibration.filcdn.io/baga6ea4seaqnx22oectnclv2hk4lbeyvfsf5svnk6n3rcbhh674cqmxaykla2da",
+        request,
+        env,
+        ctx,
+      );
+    case "/fetched/pdp":
+      return fetchWithDefaultCaching(
+        "https://polynomial.computer/piece/baga6ea4seaqnx22oectnclv2hk4lbeyvfsf5svnk6n3rcbhh674cqmxaykla2da",
+        request,
+        env,
+        ctx,
+      );
+
     case "/cached/kv":
-      return fetchCached("/kv", request, env, ctx);
+      return fetchWithExplicitCaching("/kv", request, env, ctx);
     case "/cached/d1":
-      return fetchCached("/d1", request, env, ctx);
+      return fetchWithExplicitCaching("/d1", request, env, ctx);
+    case "/cached/filcdn":
+      return fetchWithExplicitCaching(
+        "https://0x23178ccd27cda5d5d18b211ad6648e189c1e16e1.calibration.filcdn.io/baga6ea4seaqnx22oectnclv2hk4lbeyvfsf5svnk6n3rcbhh674cqmxaykla2da",
+        request,
+        env,
+        ctx,
+      );
+    case "/cached/pdp":
+      return fetchWithDefaultCaching(
+        "https://polynomial.computer/piece/baga6ea4seaqnx22oectnclv2hk4lbeyvfsf5svnk6n3rcbhh674cqmxaykla2da",
+        request,
+        env,
+        ctx,
+      );
   }
   return new Response("Not Found", { status: 404 });
 }
 
-async function fetchCached(
+async function fetchWithDefaultCaching(
   path: string,
   request: Request,
   env: Env,
   ctx: ExecutionContext,
 ): Promise<unknown | Response> {
   const url = new URL(path, request.url);
-  console.log(`fetching ${url} with caching`);
+  console.log(`Fetching ${url} with default caching`);
+
   const res = await fetch(url, {
     cf: {
       cacheTtl: 60, // Cache for 60 seconds
       cacheEverything: true, // Cache everything, including HTML responses
     },
   });
+
+  const cacheStatus = res.headers.get("CF-Cache-Status");
   if (!res.ok) {
     const reason = await res.text();
-    return { error: res.status, reason };
+    return { cacheStatus, error: res.status, reason };
   }
   const body = await res.json();
-  return { headers: Object.fromEntries(res.headers.entries()), body };
+  return { cacheStatus, headers: Object.fromEntries(res.headers.entries()), body };
+}
+
+async function fetchWithExplicitCaching(
+  path: string,
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<unknown | Response> {
+  const url = new URL(path, request.url);
+  console.log(`Fetching ${url} with caching`);
+
+  const cacheKey = new Request(url.toString(), request);
+
+  let cachedResponse = await caches.default.match(cacheKey);
+  if (cachedResponse) {
+    console.log(`Cache hit for ${url}`);
+    const cacheStatus = cachedResponse.headers.get("CF-Cache-Status");
+    const body = await cachedResponse.json();
+    return { cacheStatus, headers: Object.fromEntries(cachedResponse.headers.entries()), body };
+  } else {
+    const res = await fetch(url, {
+      cf: {
+        cacheTtl: 60, // Cache for 60 seconds
+        cacheEverything: true, // Cache everything, including HTML responses
+      },
+    });
+    const [body1, body2] = res.body?.tee() ?? [null, null];
+    caches.default.put(url.toString(), new Response(body1, res));
+    cachedResponse = new Response(body2, res);
+  }
+
+  const cacheStatus = cachedResponse.headers.get("CF-Cache-Status");
+  if (!cachedResponse.ok) {
+    const reason = await cachedResponse.text();
+    return { cacheStatus, error: cachedResponse.status, reason };
+  }
+  const body = await cachedResponse.json();
+  return { cacheStatus, headers: Object.fromEntries(cachedResponse.headers.entries()), body };
 }

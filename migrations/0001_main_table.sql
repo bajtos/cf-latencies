@@ -1,0 +1,9 @@
+-- Migration number: 0001 	 2025-07-18T08:16:52.730Z
+
+CREATE TABLE IF NOT EXISTS main (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO main (name) VALUES ('Initial Entry');
